@@ -2,8 +2,9 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import os
 
-# створюємо шлях до папки, якe буде приймати функція
+# створюємо шлях до папки, який буде прийматися через командний рядок
 p = Path(sys.argv[1])
 
 # створюємо папки у які будемо складати файли за типом
@@ -19,6 +20,14 @@ folder5 = p / 'archives'
 folder5.mkdir(parents = True, exist_ok = True)
 folder6 = p / 'unknown'
 folder6.mkdir(parents = True, exist_ok = True)
+
+# створюємо пусті списки для файлів
+files_in_images = []
+files_in_documents = []
+files_in_audio = []
+files_in_video = []
+files_in_archives = []
+files_in_unknown = []
 
 # функція для нормалізації назви файлів (транслітерація, заміна символів)
 def normalize(file_name_for_norm):
@@ -36,53 +45,56 @@ def normalize(file_name_for_norm):
     }
     # виконується транслітерація кириличних символи на латиницю
     for cyrylic, latun in translit_dict.items():
-        file_name_for_norm = file_name_for_norm.replace(cyrylic, latun)
+        name, extension = os.path.splitext(file_name_for_norm)
+        new_file_name = name.replace(cyrylic, latun)
         # застосовуємо регулярний вираз, щоб замінити всі інші символи на символ '_'
-    file_name_for_norm = re.sub(r'[^a-zA-Z0-9]', '_', file_name_for_norm)
+        new_file_name = re.sub(r'[^a-zA-Z0-9]', '_', new_file_name)
+        new_file_name_norm = new_file_name + extension
+    return new_file_name_norm
 
-    return file_name_for_norm
+# проходимося по кожному елементу в папці
+for element in p.glob("**/*"):
+    # ігноруємо папки у які будемо сортувати
+    if element.name in ('images', 'documents', 'audio', 'video', 'archives', 'unknown'):
+        continue
+    # сортування в залежності від розширення файлу
+    if element.is_file():
+        normalized_file_name = normalize(element.name)
+        if element.suffix.lower() in ('.jpeg', '.png', '.jpg', '.svg'):
+            shutil.move(str(element), str(folder1 / normalized_file_name))
+            files_in_images.append(normalized_file_name)
+        elif element.suffix.lower() in ('.avi', '.mp4', '.mov', '.mkv'):
+            shutil.move(str(element), str(folder4 / normalized_file_name))
+            files_in_video.append(normalized_file_name)
+        elif element.suffix.lower() in ('.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'):
+            shutil.move(str(element), str(folder2 / normalized_file_name))
+            files_in_documents.append(normalized_file_name)
+        elif element.suffix.lower() in ('.mp3', '.ogg', '.wav', '.amr'):
+            shutil.move(str(element), str(folder3 / normalized_file_name))
+            files_in_audio.append(normalized_file_name)
+        elif element.suffix.lower() in ('.zip', '.gz', '.tar', '.rar'):
+            dir_archive = folder5 / element.stem
+            dir_archive.mkdir(parents = True, exist_ok = True)
+            # розпаковуємо знайдений архів у папку архів, stem обрізає розширення
+            shutil.unpack_archive(str(element), str(dir_archive))
+            files_in_archives.append(normalized_file_name)
+        else:
+            # всі інші файли кладемо у папку unknown
+            shutil.move(str(element), str(folder6 / normalized_file_name))
+            files_in_unknown.append(normalized_file_name)
+    elif element.is_dir():
+        if not list(element.iterdir()):
+        # якщо папка пуста - видаляється
+            element.rmdir()
 
-def sorted_files(p):
-    # створюємо пусті списки для файлів
-    files_in_images = []
-    files_in_documents = []
-    files_in_audio = []
-    files_in_video = []
-    files_in_archives = []
-    files_in_unknown = []
+# видаляємо папки, які не потрібні
+for item in p.glob("*"):
+    if item.is_dir() and item.name not in ['archives', 'images', 'documents', 'video', 'audio', 'unknown']:
+        shutil.rmtree(item)
 
-    # проходимося по кожному елементу в папці
-    for element in p.iterdir():
-        # ігноруємо папки у які будемо сортувати
-        if element.name in ('images', 'documents', 'audio', 'video', 'archives', 'unknown'):
-            continue
-        # сортування в залежності від розширення файлу
-        if element.is_file():
-            if element.suffix.lower() in ('.jpeg', '.png', '.jpg', '.svg'):
-                shutil.move(str(element), str(folder1 / element.name))
-                files_in_images.append(element.name)
-            elif element.suffix.lower() in ('.avi', '.mp4', '.mov', '.mkv'):
-                shutil.move(str(element), str(folder4 / element.name))
-                files_in_video.append(element.name)
-            elif element.suffix.lower() in ('.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'):
-                shutil.move(str(element), str(folder2 / element.name))
-                files_in_documents.append(element.name)
-            elif element.suffix.lower() in ('.mp3', '.ogg', '.wav', '.amr'):
-                shutil.move(str(element), str(folder3 / element.name))
-                files_in_audio.append(element.name)
-            elif element.suffix.lower() in ('.zip', '.gz', '.tar'):
-                # розпаковуємо знайдений архів у папку архів, stem обрізає розширення
-                shutil.unpack_archive(str(element), str(folder5 / element.stem))
-                files_in_archives.append(element.name)
-            else:
-                # всі інші файли кладемо у папку unknown
-                shutil.move(str(element), str(folder6 / element.name))
-                files_in_unknown.append(element.name)
-        elif element.is_dir():
-            # якщо елемент у папці є папкою викликаємо знову функцію для перегляду файлів у цій папці
-            sorted_files(element)
-            if not list(element.iterdir()):
-                # якщо папка пуста - видаляється
-                element.rmdir()
-    print({'images': files_in_images, 'documents': files_in_documents, 'audio': files_in_audio, 'video': files_in_video, 'archives': files_in_archives, 'unknown': files_in_unknown})
-    return {'images': files_in_images, 'documents': files_in_documents, 'audio': files_in_audio, 'video': files_in_video, 'archives': files_in_archives, 'unknown': files_in_unknown}
+# видаляємо файли, які не потрбіні
+for item in p.iterdir():
+    if item.is_file():
+        item.unlink()
+
+print({'images': files_in_images, 'documents': files_in_documents, 'audio': files_in_audio, 'video': files_in_video, 'archives': files_in_archives, 'unknown': files_in_unknown})
