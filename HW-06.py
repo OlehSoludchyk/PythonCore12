@@ -30,7 +30,7 @@ files_in_archives = []
 files_in_unknown = []
 
 # функція для нормалізації назви файлів (транслітерація, заміна символів)
-def normalize(file_name_for_norm):
+def normalize(name_for_norm):
     # створюємо словник відповідностей для транслітерації букв
     translit_dict = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'є': 'ie',
@@ -44,13 +44,11 @@ def normalize(file_name_for_norm):
         'Щ': 'Shch', 'Ю': 'Yu', 'Я': 'Ya'
     }
     # виконується транслітерація кириличних символи на латиницю
-    for cyrylic, latun in translit_dict.items():
-        name, extension = os.path.splitext(file_name_for_norm)
-        new_file_name = name.replace(cyrylic, latun)
-        # застосовуємо регулярний вираз, щоб замінити всі інші символи на символ '_'
-        new_file_name = re.sub(r'[^a-zA-Z0-9]', '_', new_file_name)
-        new_file_name_norm = new_file_name + extension
-    return new_file_name_norm
+    for cyr, lat in translit_dict.items():
+        name, extension = os.path.splitext(name_for_norm)
+        new_name = name.replace(cyr, lat)
+        new_name = re.sub(r'[^a-zA-Z0-9]', '_', new_name)
+    return new_name + extension
 
 # проходимося по кожному елементу в папці
 for element in p.glob("**/*"):
@@ -98,3 +96,11 @@ for item in p.iterdir():
         item.unlink()
 
 print({'images': files_in_images, 'documents': files_in_documents, 'audio': files_in_audio, 'video': files_in_video, 'archives': files_in_archives, 'unknown': files_in_unknown})
+
+if __name__ == '__main__':
+    print('Images:', files_in_images)
+    print('Documents:', files_in_documents)
+    print('Audio:', files_in_audio)
+    print('Video:', files_in_video)
+    print('Archives:', files_in_archives)
+    print('Unknown:', files_in_unknown)
